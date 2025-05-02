@@ -1,103 +1,47 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { check, validationResult } = require('express-validator');
-const supabase = require('../supabase');
-const auth = require('../middleware/auth');
-
+const { body, validationResult } = require('express-validator');
 const router = express.Router();
+
+// Dữ liệu tĩnh thay cho Supabase
+const users = [];
 
 // Đăng ký
 router.post('/register', [
-    check('email', 'Email is required').isEmail(),
-    check('password', 'Password must be at least 6 characters').isLength({ min: 6 }),
-    check('name', 'Name is required').not().isEmpty()
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 6 }),
+  body('name').notEmpty()
 ], async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { email, password, name, role } = req.body;
-
-    try {
-        const { data: userExists, error: fetchError } = await supabase
-            .from('users')
-            .select('email')
-            .eq('email', email)
-            .single();
-
-        if (fetchError && fetchError.code !== 'PGRST116') {
-            return res.status(500).json({ message: 'Server error', error: fetchError.message });
-        }
-
-        if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const { data: newUser, error: insertError } = await supabase
-            .from('users')
-            .insert([
-                { email, password: hashedPassword, name, role: role || 'user' }
-            ])
-            .select()
-            .single();
-
-        if (insertError) {
-            return res.status(500).json({ message: 'Server error', error: insertError.message });
-        }
-
-        res.status(201).json(newUser);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
+  const { email, password, name } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = { id: users.length + 1, email, password: hashedPassword, name };
+  users.push(user);
+  res.status(201).json({ message: 'User registered', userId: user.id });
 });
 
 // Đăng nhập
 router.post('/login', [
-    check('email', 'Email is required').isEmail(),
-    check('password', 'Password is required').exists()
+  body('email').isEmail().normalizeEmail(),
+  body('password').notEmpty()
 ], async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { email, password } = req.body;
+  const { email, password } = req.body;
+  const user = users.find(u => u.email === email);
+  if (!user) return res.status(400).json({ message: 'User not found' });
 
-    try {
-        const { data: user, error: fetchError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single();
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
-        if (fetchError || !user) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        if (!process.env.JWT_SECRET) {
-            return res.status(500).json({ message: 'Server configuration error: JWT_SECRET is missing' });
-        }
-
-        const token = jwt.sign(
-            { id: user.id, role: user.role },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        );
-
-        res.json({ token });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
+  const token = jwt.sign({ id: user.id, email: user.email }, 'secret_key', { expiresIn: '1h' });
+  res.json({ token });
 });
+
 
 // Đăng xuất (Client-side, không cần xử lý trên server với JWT)
 router.post('/logout', auth(['user', 'editor', 'admin']), (req, res) => {
