@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Orbital News</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="admin.js" defer></script>
+</head>
+<body>
+    <nav>
+        <div class="main-nav container flex">
+            <a href="index.html" class="company-logo">
+                <img src="./Images/logo.png" alt="logo">
+            </a>
+            <div class="nav-links">
+                <ul class="flex">
+                    <li class="hover-link nav-item"><a href="index.html">Home</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <div class="container">
+            <h2>Admin Panel</h2>
+            <h3>Create New Post</h3>
+            <input type="text" id="post-title" placeholder="Title">
+            <textarea id="post-content" placeholder="Content"></textarea>
+            <input type="text" id="post-image" placeholder="Image URL">
+            <button class="search-button" id="create-post">Create Post</button>
+            <h3>Posts</h3>
+            <div id="admin-posts"></div>
+        </div>
+    </main>
+</body>
+</html>
